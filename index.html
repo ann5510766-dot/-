@@ -152,7 +152,7 @@
       <button class="btn" onclick="openFundModal()">＋ 新增基金</button>
     </div>
     <div class="panel">
-      <p class="small-note">除息日會自動計算：基準日 + 1 天，若遇週六日或國定假日則順延到下一個工作日。基準日請每個月自行到基金公司網站查詢後更新。</p>
+      <p class="small-note">除息日會依基準日自動帶入建議值（基準日 + 1 天，遇週六日或國定假日順延到下一個工作日），你也可以自行修改成正確日期。基準日請每個月自行到基金公司網站查詢後更新。</p>
       <table>
         <thead><tr><th>名稱</th><th>基準日</th><th>除息日（自動）</th><th>幣別</th><th>網站連結</th><th></th></tr></thead>
         <tbody id="fund-tbody"></tbody>
@@ -226,10 +226,11 @@
 <!-- 新增基金 Modal -->
 <div class="overlay" id="fund-overlay">
   <div class="modal">
-    <h3>新增基金資訊</h3>
-    <div class="hint">此系統統一設定為月配，除息日會自動根據基準日計算，不需要手動輸入</div>
+    <h3 id="fund-modal-title">新增基金資訊</h3>
+    <div class="hint">此系統統一設定為月配，除息日會依基準日自動帶入建議值，你也可以自行修改</div>
     <div class="field"><label>名稱</label><input id="f-name" placeholder="例：某某月配債券基金"></div>
-    <div class="field"><label>基準日（請至基金公司網站查詢當月公告日期）</label><input id="f-base" type="date"></div>
+    <div class="field"><label>基準日（請至基金公司網站查詢當月公告日期）</label><input id="f-base" type="date" onchange="suggestExDiv()"></div>
+    <div class="field"><label>除息日（自動帶入建議值，可自行修改）</label><input id="f-exdiv" type="date"></div>
     <div class="field"><label>幣別</label>
       <select id="f-currency">
         <option>TWD</option><option>USD</option><option>USD(南非幣計價)</option><option>人民幣</option>
@@ -492,25 +493,46 @@ function confirmEmptyTrash(){
 }
 
 // ---- 基金 modal ----
-function openFundModal(){
-  document.getElementById('f-name').value='';
-  document.getElementById('f-base').value='';
-  document.getElementById('f-link').value='';
+let editingFundId = null;
+
+function suggestExDiv(){
+  const base = document.getElementById('f-base').value;
+  if(base){ document.getElementById('f-exdiv').value = calcExDivDate(base); }
+}
+
+function openFundModal(fundId){
+  editingFundId = fundId || null;
+  const editing = funds.find(f=>f.id===editingFundId);
+  document.getElementById('fund-modal-title').textContent = editing ? '編輯基金資訊' : '新增基金資訊';
+  document.getElementById('f-name').value = editing ? editing.name : '';
+  document.getElementById('f-base').value = editing ? (editing.base||'') : '';
+  document.getElementById('f-exdiv').value = editing ? (editing.exdiv||'') : '';
+  document.getElementById('f-currency').value = editing ? editing.currency : 'TWD';
+  document.getElementById('f-link').value = editing ? (editing.link||'') : '';
   document.getElementById('fund-overlay').classList.add('show');
 }
 function submitFund(){
   const name = document.getElementById('f-name').value.trim();
   if(!name){ showToast('基金名稱是必填的'); return; }
-  funds.push({
-    id: nextFundId++, name,
+  const payload = {
+    name,
     base: document.getElementById('f-base').value,
+    exdiv: document.getElementById('f-exdiv').value,
     currency: document.getElementById('f-currency').value,
     link: document.getElementById('f-link').value,
-  });
+  };
+  if(editingFundId){
+    const idx = funds.findIndex(x=>x.id===editingFundId);
+    funds[idx] = {...funds[idx], ...payload};
+    showToast('已更新這檔基金');
+  }else{
+    funds.push({ id: nextFundId++, ...payload });
+    showToast('⛴️ 大船入港');
+  }
+  editingFundId = null;
   closeModal('fund-overlay');
   saveData();
   renderAll();
-  showToast('⛴️ 大船入港');
 }
 function deleteFund(id){
   document.getElementById('confirm-title').textContent = '確定要刪除這檔基金嗎？';
@@ -579,8 +601,8 @@ function renderAll(){
   const upcomingPolicies = policies.filter(p=>{
     return p.holdings.some(h=>{
       const f = funds.find(x=>x.id===h.fundId);
-      if(!f || !f.base) return false;
-      const exdiv = new Date(calcExDivDate(f.base) + 'T00:00:00');
+      if(!f || !f.exdiv) return false;
+      const exdiv = new Date(f.exdiv + 'T00:00:00');
       return exdiv >= today && exdiv <= in7days;
     });
   });
@@ -590,7 +612,7 @@ function renderAll(){
     upcomingEl.innerHTML = upcomingPolicies.map(p=>{
       const holdingInfo = p.holdings.map(h=>{
         const f = funds.find(x=>x.id===h.fundId);
-        const exdiv = f && f.base ? calcExDivDate(f.base) : '-';
+        const exdiv = f ? (f.exdiv||'-') : '-';
         return `${fundName(h.fundId)}（除息日 ${exdiv}）`;
       }).join('、') || '（尚未連結標的）';
       return `<div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;">
@@ -616,9 +638,12 @@ function renderAll(){
   // funds table
   document.getElementById('fund-tbody').innerHTML = funds.length ? funds.map(f=>`
     <tr>
-      <td>${f.name}</td><td>${f.base||'-'}</td><td>${calcExDivDate(f.base)||'-'}</td><td>${f.currency}</td>
+      <td>${f.name}</td><td>${f.base||'-'}</td><td>${f.exdiv||'-'}</td><td>${f.currency}</td>
       <td>${f.link ? `<a class="link" href="${f.link}" target="_blank">連結</a>` : '-'}</td>
-      <td><button class="btn danger" style="padding:5px 10px;font-size:12px;" onclick="deleteFund(${f.id})">刪除</button></td>
+      <td>
+        <button class="btn secondary" style="padding:5px 10px;font-size:12px;" onclick="openFundModal(${f.id})">編輯</button>
+        <button class="btn danger" style="padding:5px 10px;font-size:12px;" onclick="deleteFund(${f.id})">刪除</button>
+      </td>
     </tr>`).join('') : `<tr><td colspan="6" class="empty">還沒有基金資料</td></tr>`;
 
   // trash table
