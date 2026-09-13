@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>保單益暨系統</title>
+<style>
+  :root{
+    --bg:#f7f5f2; --panel:#ffffff; --ink:#2b2620; --sub:#8a8177;
+    --line:#e8e3db; --accent:#c98a5e; --accent-ink:#7a4a2a; --accent-bg:#fbeee1;
+    --danger:#b5533f; --danger-bg:#fbeae5; --ok:#4a7a5e; --ok-bg:#e9f3ec;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 28px; background:var(--panel); border-bottom:1px solid var(--line);
+  }
+  header h1{font-size:17px; margin:0; font-weight:700;}
+  header .tag{font-size:12px; color:var(--sub);}
+  .honest-banner{
+    background:var(--accent-bg); color:var(--accent-ink); font-size:12.5px;
+    padding:8px 28px; border-bottom:1px solid var(--line);
+  }
+  nav{
+    display:flex; gap:6px; padding:12px 28px; background:var(--panel);
+    border-bottom:1px solid var(--line); overflow-x:auto;
+  }
+  nav button{
+    border:none; background:transparent; padding:9px 16px; border-radius:999px;
+    font-size:13.5px; color:var(--sub); cursor:pointer; white-space:nowrap;
+  }
+  nav button.active{background:var(--accent); color:#fff; font-weight:600;}
+  main{padding:24px 28px 60px; max-width:1080px; margin:0 auto;}
+  .page{display:none;}
+  .page.active{display:block;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:22px;}
+  .stat{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px;}
+  .stat .label{font-size:12.5px; color:var(--sub); margin-bottom:8px;}
+  .stat .value{font-size:24px; font-weight:700;}
+  .stat.warn .value{color:var(--danger);}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; margin-bottom:18px;}
+  .panel h2{font-size:14.5px; margin:0 0 12px;}
+  .row-between{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .btn{
+    border:none; border-radius:9px; padding:9px 16px; font-size:13.5px; cursor:pointer;
+    font-weight:600; background:var(--accent); color:#fff;
+  }
+  .btn.secondary{background:var(--accent-bg); color:var(--accent-ink);}
+  .btn.danger{background:var(--danger-bg); color:var(--danger);}
+  .btn.ghost{background:transparent; color:var(--sub); border:1px solid var(--line);}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th,td{text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); white-space:nowrap;}
+  th{color:var(--sub); font-weight:600; font-size:12px;}
+  tr:last-child td{border-bottom:none;}
+  .pill{display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; background:var(--accent-bg); color:var(--accent-ink);}
+  .empty{color:var(--sub); font-size:13px; padding:20px 0; text-align:center;}
+  .link{color:var(--accent-ink); text-decoration:none; font-size:12.5px;}
+  /* modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(30,25,20,.35); display:none;
+    align-items:center; justify-content:center; padding:20px; z-index:50;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:#fff; border-radius:16px; padding:22px 24px; width:100%; max-width:520px;
+    max-height:88vh; overflow-y:auto;
+  }
+  .modal h3{margin:0 0 4px; font-size:16px;}
+  .modal .hint{font-size:12px; color:var(--sub); margin-bottom:16px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:12.5px; color:var(--sub); margin-bottom:5px;}
+  .field input, .field select{
+    width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:13.5px;
+    font-family:inherit;
+  }
+  .fund-row{display:grid; grid-template-columns:2fr 1fr auto; gap:8px; align-items:center; margin-bottom:8px;}
+  .fund-row input{width:100%;}
+  .ratio-sum{font-size:12px; margin-top:4px;}
+  .ratio-sum.ok{color:var(--ok);}
+  .ratio-sum.bad{color:var(--danger);}
+  .modal-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:18px;}
+  .conditional{border-top:1px dashed var(--line); margin-top:10px; padding-top:10px;}
+  .toast{
+    position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:#2b2620; color:#fff; padding:12px 22px; border-radius:12px; font-size:14px;
+    opacity:0; transition:.25s; pointer-events:none; z-index:60;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .confirm{max-width:360px; text-align:center;}
+  .confirm p{font-size:13.5px; color:var(--sub); margin:6px 0 18px;}
+  .small-note{font-size:11.5px; color:var(--sub); margin-top:8px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>保單益暨系統</h1>
+    <div class="tag">保險業務員專屬工作台</div>
+  </div>
+  <div class="tag">投資型保單管理工具</div>
+</header>
+
+<div class="honest-banner">
+  本機儲存 · 資料只存在「這台裝置、這個瀏覽器」，換一台電腦或清除瀏覽器資料就會不見 · 請定期使用「備份與匯出」下載備份檔
+</div>
+
+<nav>
+  <button class="active" data-page="dashboard">儀表板</button>
+  <button data-page="policies">保單清單</button>
+  <button data-page="funds">基金資訊</button>
+  <button data-page="backup">備份與匯出</button>
+  <button data-page="trash">垃圾桶</button>
+</nav>
+
+<main>
+
+  <!-- 儀表板 -->
+  <div class="page active" id="page-dashboard">
+    <div class="grid" id="dash-stats"></div>
+    <div class="panel">
+      <h2>即將配息提醒（未來 7 天）</h2>
+      <div id="dash-upcoming"></div>
+    </div>
+  </div>
+
+  <!-- 保單清單 -->
+  <div class="page" id="page-policies">
+    <div class="row-between">
+      <h2 style="margin:0;font-size:15px;">保單清單</h2>
+      <button class="btn" onclick="openPolicyModal()">＋ 新增保單</button>
+    </div>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr><th>客戶名稱</th><th>保單號碼</th><th>生效日</th><th>簽收日</th><th>投入日</th><th>投入金額</th><th>連結標的</th><th>保貸</th><th></th></tr>
+        </thead>
+        <tbody id="policy-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 基金資訊 -->
+  <div class="page" id="page-funds">
+    <div class="row-between">
+      <h2 style="margin:0;font-size:15px;">基金資訊（標的主檔 · 固定月配）</h2>
+      <button class="btn" onclick="openFundModal()">＋ 新增基金</button>
+    </div>
+    <div class="panel">
+      <p class="small-note">除息日會自動計算：基準日 + 1 天，若遇週六日或國定假日則順延到下一個工作日。基準日請每個月自行到基金公司網站查詢後更新。</p>
+      <table>
+        <thead><tr><th>名稱</th><th>基準日</th><th>除息日（自動）</th><th>幣別</th><th>網站連結</th><th></th></tr></thead>
+        <tbody id="fund-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 備份與匯出 -->
+  <div class="page" id="page-backup">
+    <div class="panel">
+      <h2>備份與匯出</h2>
+      <p style="font-size:13px;color:var(--sub);">匯出：下載目前所有保單與基金資料的備份檔。匯入：<b>會完全取代</b>目前系統裡的所有資料，請先確認再操作。</p>
+      <div style="display:flex; gap:10px;">
+        <button class="btn secondary" onclick="exportBackup()">匯出備份</button>
+        <button class="btn secondary" onclick="triggerImport()">匯入還原</button>
+        <input type="file" id="import-file" accept="application/json" style="display:none" onchange="handleImportFile(event)">
+      </div>
+    </div>
+  </div>
+
+  <!-- 垃圾桶 -->
+  <div class="page" id="page-trash">
+    <div class="row-between">
+      <h2 style="margin:0;font-size:15px;">垃圾桶（手動清空，不會自動到期）</h2>
+      <button class="btn danger" onclick="confirmEmptyTrash()">清空垃圾桶</button>
+    </div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>客戶名稱</th><th>保單號碼</th><th>刪除時間</th><th></th></tr></thead>
+        <tbody id="trash-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<!-- 新增保單 Modal -->
+<div class="overlay" id="policy-overlay">
+  <div class="modal">
+    <h3 id="policy-modal-title">新增保單</h3>
+    <div class="hint">連結標的最多 5 檔，非必選；若有選擇，投入比例總和需等於 100%</div>
+    <div class="field"><label>客戶名稱</label><input id="p-name" placeholder="例：王小明"></div>
+    <div class="field"><label>保單號碼</label><input id="p-no" placeholder="例：POL-2026-001"></div>
+    <div class="field"><label>生效日</label><input id="p-effective" type="date"></div>
+    <div class="field"><label>簽收日</label><input id="p-sign-date" type="date" onchange="updateInvestDate()"></div>
+    <div class="field"><label>投入日（= 簽收日 + 11 天，依保險法契約撤銷期限，系統自動帶入不用手動填）</label><input id="p-invest-date" type="date" readonly style="background:#f2efe9;color:var(--sub);"></div>
+    <div class="field"><label>投入金額</label><input id="p-amount" type="number" placeholder="例：500000"></div>
+
+    <div class="field">
+      <label>連結基金標的（最多 5 檔）</label>
+      <div id="fund-rows"></div>
+      <button class="btn ghost" type="button" onclick="addFundRow()" style="font-size:12px;padding:6px 10px;">＋ 加一檔標的</button>
+      <div class="ratio-sum" id="ratio-sum">尚未選擇標的</div>
+    </div>
+
+    <div class="field">
+      <label><input type="checkbox" id="p-loan" style="width:auto;display:inline-block;margin-right:6px;" onchange="toggleLoanFields()">是否有保貸</label>
+    </div>
+    <div class="conditional" id="loan-fields" style="display:none;">
+      <div class="field"><label>保貸日期</label><input id="p-loan-date" type="date"></div>
+      <div class="field"><label>成數</label><input id="p-loan-ratio" type="number" placeholder="例：70（代表 70%）"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal('policy-overlay')">取消</button>
+      <button class="btn" onclick="submitPolicy()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新增基金 Modal -->
+<div class="overlay" id="fund-overlay">
+  <div class="modal">
+    <h3>新增基金資訊</h3>
+    <div class="hint">此系統統一設定為月配，除息日會自動根據基準日計算，不需要手動輸入</div>
+    <div class="field"><label>名稱</label><input id="f-name" placeholder="例：某某月配債券基金"></div>
+    <div class="field"><label>基準日（請至基金公司網站查詢當月公告日期）</label><input id="f-base" type="date"></div>
+    <div class="field"><label>幣別</label>
+      <select id="f-currency">
+        <option>TWD</option><option>USD</option><option>USD(南非幣計價)</option><option>人民幣</option>
+      </select>
+    </div>
+    <div class="field"><label>網站連結</label><input id="f-link" placeholder="https://..."></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal('fund-overlay')">取消</button>
+      <button class="btn" onclick="submitFund()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用確認 Modal -->
+<div class="overlay" id="confirm-overlay">
+  <div class="modal confirm">
+    <h3 id="confirm-title">確定要刪除嗎？</h3>
+    <p id="confirm-body">刪除後會移到垃圾桶，可以再救回來。</p>
+    <div class="modal-actions" style="justify-content:center;">
+      <button class="btn ghost" onclick="closeModal('confirm-overlay')">取消</button>
+      <button class="btn danger" id="confirm-action-btn">確定</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ---- 國定假日／金融市場休市日清單（範例！請自行核對「行政院人事行政總處」或證交所公告後更新，建議每年更新一次）----
+const NATIONAL_HOLIDAYS = [
+  '2026-01-01',
+  '2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20',
+  '2026-02-28',
+  '2026-04-04','2026-04-05',
+  '2026-05-01',
+  '2026-06-19',
+  '2026-09-25',
+  '2026-10-09','2026-10-10',
+];
+
+function isNonBusinessDay(d){
+  const day = d.getDay();
+  if(day===0 || day===6) return true;
+  return NATIONAL_HOLIDAYS.includes(d.toISOString().slice(0,10));
+}
+
+function calcExDivDate(baseDateStr){
+  if(!baseDateStr) return '';
+  let d = new Date(baseDateStr + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  while(isNonBusinessDay(d)){ d.setDate(d.getDate() + 1); }
+  return d.toISOString().slice(0,10);
+}
+
+// ---- 本機儲存（localStorage）----
+const STORAGE_KEY = 'policyManagerData';
+
+function saveData(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({funds, policies, trash}));
+  }catch(e){
+    showToast('儲存失敗，可能是瀏覽器儲存空間已滿');
+  }
+}
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return {funds:[], policies:[], trash:[]};
+    const data = JSON.parse(raw);
+    return {
+      funds: Array.isArray(data.funds) ? data.funds : [],
+      policies: Array.isArray(data.policies) ? data.policies : [],
+      trash: Array.isArray(data.trash) ? data.trash : [],
+    };
+  }catch(e){
+    return {funds:[], policies:[], trash:[]};
+  }
+}
+
+const loaded = loadData();
+let funds = loaded.funds;
+let policies = loaded.policies;
+let trash = loaded.trash;
+let fundRowCount = 0;
+const usedIds = [0, ...policies.map(p=>p.id), ...trash.map(p=>p.id)];
+let nextPolicyId = Math.max(...usedIds) + 1;
+let nextFundId = funds.length ? Math.max(...funds.map(f=>f.id)) + 1 : 1;
+
+function fundName(id){ const f = funds.find(x=>x.id==id); return f ? f.name : '（已刪除的基金）'; }
+
+// ---- nav ----
+document.querySelectorAll('nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('page-'+btn.dataset.page).classList.add('active');
+    renderAll();
+  });
+});
+
+// ---- toast ----
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+// ---- 保單 modal ----
+let editingPolicyId = null;
+
+function openPolicyModal(policyId){
+  editingPolicyId = policyId || null;
+  const editing = policies.find(p=>p.id===editingPolicyId);
+
+  document.getElementById('policy-modal-title').textContent = editing ? '編輯保單' : '新增保單';
+  document.getElementById('p-name').value = editing ? editing.name : '';
+  document.getElementById('p-no').value = editing ? editing.no : '';
+  document.getElementById('p-effective').value = editing ? (editing.effective||'') : '';
+  document.getElementById('p-sign-date').value = editing ? (editing.signDate||'') : '';
+  document.getElementById('p-invest-date').value = editing ? (editing.investDate||'') : '';
+  document.getElementById('p-amount').value = editing ? editing.amount : '';
+  document.getElementById('p-loan').checked = editing ? !!editing.loan : false;
+  document.getElementById('loan-fields').style.display = (editing && editing.loan) ? 'block' : 'none';
+  document.getElementById('p-loan-date').value = editing ? (editing.loanDate||'') : '';
+  document.getElementById('p-loan-ratio').value = editing ? (editing.loanRatio||'') : '';
+
+  document.getElementById('fund-rows').innerHTML='';
+  fundRowCount = 0;
+  if(editing && editing.holdings.length){
+    editing.holdings.forEach(h=>addFundRow(h.fundId, h.ratio));
+  }
+  updateRatioSum();
+  document.getElementById('policy-overlay').classList.add('show');
+}
+
+function addFundRow(presetFundId, presetRatio){
+  if(fundRowCount>=5){ showToast('最多只能選 5 檔標的'); return; }
+  fundRowCount++;
+  const wrap = document.getElementById('fund-rows');
+  const row = document.createElement('div');
+  row.className='fund-row';
+  const options = funds.map(f=>`<option value="${f.id}" ${presetFundId==f.id?'selected':''}>${f.name}</option>`).join('');
+  row.innerHTML = `
+    <select class="fund-select">${options}</select>
+    <input type="number" class="fund-ratio" placeholder="比例%" value="${presetRatio!=null?presetRatio:''}" oninput="updateRatioSum()">
+    <button class="btn ghost" type="button" style="font-size:12px;padding:6px 8px;" onclick="this.parentElement.remove(); updateRatioSum();">移除</button>`;
+  wrap.appendChild(row);
+  updateRatioSum();
+}
+
+function updateRatioSum(){
+  const ratios = Array.from(document.querySelectorAll('.fund-ratio')).map(i=>Number(i.value)||0);
+  const el = document.getElementById('ratio-sum');
+  if(ratios.length===0){ el.textContent='尚未選擇標的（可不選，直接儲存）'; el.className='ratio-sum'; return; }
+  const sum = ratios.reduce((a,b)=>a+b,0);
+  el.textContent = `目前比例總和：${sum}%（需等於 100%）`;
+  el.className = 'ratio-sum ' + (sum===100 ? 'ok' : 'bad');
+}
+
+function updateInvestDate(){
+  const signVal = document.getElementById('p-sign-date').value;
+  if(!signVal){ document.getElementById('p-invest-date').value=''; return; }
+  const d = new Date(signVal + 'T00:00:00');
+  d.setDate(d.getDate() + 11);
+  document.getElementById('p-invest-date').value = d.toISOString().slice(0,10);
+}
+
+function toggleLoanFields(){
+  document.getElementById('loan-fields').style.display = document.getElementById('p-loan').checked ? 'block':'none';
+}
+
+function submitPolicy(){
+  const name = document.getElementById('p-name').value.trim();
+  const no = document.getElementById('p-no').value.trim();
+  if(!name || !no){ showToast('客戶名稱和保單號碼是必填的喔'); return; }
+
+  const rows = Array.from(document.querySelectorAll('.fund-row'));
+  const holdings = rows.map(r=>({
+    fundId: Number(r.querySelector('.fund-select').value),
+    ratio: Number(r.querySelector('.fund-ratio').value)||0
+  }));
+  if(holdings.length>0){
+    const sum = holdings.reduce((a,b)=>a+b.ratio,0);
+    if(sum!==100){ showToast('投入比例總和必須等於 100% 才能儲存'); return; }
+  }
+
+  const hasLoan = document.getElementById('p-loan').checked;
+  const payload = {
+    name, no,
+    effective: document.getElementById('p-effective').value,
+    signDate: document.getElementById('p-sign-date').value,
+    investDate: document.getElementById('p-invest-date').value,
+    amount: Number(document.getElementById('p-amount').value)||0,
+    holdings,
+    loan: hasLoan,
+    loanDate: hasLoan ? document.getElementById('p-loan-date').value : '',
+    loanRatio: hasLoan ? document.getElementById('p-loan-ratio').value : '',
+  };
+
+  if(editingPolicyId){
+    const idx = policies.findIndex(x=>x.id===editingPolicyId);
+    policies[idx] = {...policies[idx], ...payload};
+    closeModal('policy-overlay');
+    saveData();
+    renderAll();
+    showToast('已更新這張保單');
+  }else{
+    policies.push({ id: nextPolicyId++, ...payload });
+    closeModal('policy-overlay');
+    saveData();
+    renderAll();
+    showToast('⛴️ 大船入港');
+  }
+  editingPolicyId = null;
+}
+
+function deletePolicy(id){
+  const p = policies.find(x=>x.id===id);
+  document.getElementById('confirm-title').textContent = '確定要刪除這筆保單嗎？';
+  document.getElementById('confirm-body').textContent = `${p.name}（${p.no}）將會移到垃圾桶，之後還能救回來。`;
+  const btn = document.getElementById('confirm-action-btn');
+  btn.onclick = ()=>{
+    policies = policies.filter(x=>x.id!==id);
+    trash.push({...p, deletedAt: new Date().toLocaleString('zh-TW')});
+    closeModal('confirm-overlay');
+    saveData();
+    renderAll();
+    showToast('已移到垃圾桶');
+  };
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+
+function restorePolicy(id){
+  const p = trash.find(x=>x.id===id);
+  trash = trash.filter(x=>x.id!==id);
+  policies.push(p);
+  saveData();
+  renderAll();
+  showToast('已從垃圾桶救回');
+}
+
+function confirmEmptyTrash(){
+  if(trash.length===0){ showToast('垃圾桶目前是空的'); return; }
+  document.getElementById('confirm-title').textContent = '確定要清空垃圾桶嗎？';
+  document.getElementById('confirm-body').textContent = '清空後這些保單資料就無法復原了。';
+  const btn = document.getElementById('confirm-action-btn');
+  btn.onclick = ()=>{
+    trash = [];
+    closeModal('confirm-overlay');
+    saveData();
+    renderAll();
+    showToast('垃圾桶已清空');
+  };
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+
+// ---- 基金 modal ----
+function openFundModal(){
+  document.getElementById('f-name').value='';
+  document.getElementById('f-base').value='';
+  document.getElementById('f-link').value='';
+  document.getElementById('fund-overlay').classList.add('show');
+}
+function submitFund(){
+  const name = document.getElementById('f-name').value.trim();
+  if(!name){ showToast('基金名稱是必填的'); return; }
+  funds.push({
+    id: nextFundId++, name,
+    base: document.getElementById('f-base').value,
+    currency: document.getElementById('f-currency').value,
+    link: document.getElementById('f-link').value,
+  });
+  closeModal('fund-overlay');
+  saveData();
+  renderAll();
+  showToast('⛴️ 大船入港');
+}
+function deleteFund(id){
+  document.getElementById('confirm-title').textContent = '確定要刪除這檔基金嗎？';
+  document.getElementById('confirm-body').textContent = '已經連結這檔基金的保單不受影響，資料會照舊保留。';
+  const btn = document.getElementById('confirm-action-btn');
+  btn.onclick = ()=>{
+    funds = funds.filter(x=>x.id!==id);
+    closeModal('confirm-overlay');
+    saveData();
+    renderAll();
+    showToast('已刪除');
+  };
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+
+// ---- 匯出 / 匯入 ----
+function exportBackup(){
+  const data = JSON.stringify({funds, policies, trash}, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'policy-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('備份檔已下載');
+}
+function triggerImport(){ document.getElementById('import-file').click(); }
+function handleImportFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  document.getElementById('confirm-title').textContent = '確定要匯入這份備份嗎？';
+  document.getElementById('confirm-body').textContent = '匯入後，現有的保單與基金資料會被完全取代，無法復原。';
+  const btn = document.getElementById('confirm-action-btn');
+  btn.onclick = ()=>{
+    const reader = new FileReader();
+    reader.onload = evt=>{
+      try{
+        const data = JSON.parse(evt.target.result);
+        funds = data.funds||[]; policies = data.policies||[]; trash = data.trash||[];
+        saveData();
+        renderAll();
+        showToast('已匯入，資料已取代');
+      }catch(err){ showToast('這個檔案格式看起來不對喔'); }
+    };
+    reader.readAsText(file);
+    closeModal('confirm-overlay');
+  };
+  document.getElementById('confirm-overlay').classList.add('show');
+  e.target.value='';
+}
+
+// ---- render ----
+function renderAll(){
+  // dashboard
+  const totalClients = new Set(policies.map(p=>p.name)).size;
+  const totalAmount = policies.reduce((a,p)=>a+p.amount,0);
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="stat"><div class="label">客戶總數</div><div class="value">${totalClients} 位</div></div>
+    <div class="stat"><div class="label">保單總額</div><div class="value">${(totalAmount/10000).toLocaleString()} 萬</div></div>
+    <div class="stat"><div class="label">基金標的數</div><div class="value">${funds.length} 檔</div></div>
+    <div class="stat"><div class="label">垃圾桶保單數</div><div class="value">${trash.length} 筆</div></div>
+  `;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const in7days = new Date(today); in7days.setDate(in7days.getDate()+7);
+  const upcomingEl = document.getElementById('dash-upcoming');
+  const upcomingPolicies = policies.filter(p=>{
+    return p.holdings.some(h=>{
+      const f = funds.find(x=>x.id===h.fundId);
+      if(!f || !f.base) return false;
+      const exdiv = new Date(calcExDivDate(f.base) + 'T00:00:00');
+      return exdiv >= today && exdiv <= in7days;
+    });
+  });
+  if(upcomingPolicies.length===0){
+    upcomingEl.innerHTML = `<div class="empty">近期沒有即將到來的配息</div>`;
+  }else{
+    upcomingEl.innerHTML = upcomingPolicies.map(p=>{
+      const holdingInfo = p.holdings.map(h=>{
+        const f = funds.find(x=>x.id===h.fundId);
+        const exdiv = f && f.base ? calcExDivDate(f.base) : '-';
+        return `${fundName(h.fundId)}（除息日 ${exdiv}）`;
+      }).join('、') || '（尚未連結標的）';
+      return `<div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;">
+        <b>${p.name}</b>（${p.no}） · 連結：${holdingInfo}
+      </div>`;
+    }).join('');
+  }
+
+  // policies table
+  document.getElementById('policy-tbody').innerHTML = policies.length ? policies.map(p=>{
+    const holdings = p.holdings.map(h=>`${fundName(h.fundId)} ${h.ratio}%`).join('、') || '—';
+    const loan = p.loan ? `<span class="pill">保貸 ${p.loanRatio||'-'}%</span>` : '—';
+    return `<tr>
+      <td>${p.name}</td><td>${p.no}</td><td>${p.effective||'-'}</td><td>${p.signDate||'-'}</td><td>${p.investDate||'-'}</td>
+      <td>${p.amount.toLocaleString()}</td><td>${holdings}</td><td>${loan}</td>
+      <td>
+        <button class="btn secondary" style="padding:5px 10px;font-size:12px;" onclick="openPolicyModal(${p.id})">編輯</button>
+        <button class="btn danger" style="padding:5px 10px;font-size:12px;" onclick="deletePolicy(${p.id})">刪除</button>
+      </td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="9" class="empty">目前沒有保單，點右上角「新增保單」開始建立</td></tr>`;
+
+  // funds table
+  document.getElementById('fund-tbody').innerHTML = funds.length ? funds.map(f=>`
+    <tr>
+      <td>${f.name}</td><td>${f.base||'-'}</td><td>${calcExDivDate(f.base)||'-'}</td><td>${f.currency}</td>
+      <td>${f.link ? `<a class="link" href="${f.link}" target="_blank">連結</a>` : '-'}</td>
+      <td><button class="btn danger" style="padding:5px 10px;font-size:12px;" onclick="deleteFund(${f.id})">刪除</button></td>
+    </tr>`).join('') : `<tr><td colspan="6" class="empty">還沒有基金資料</td></tr>`;
+
+  // trash table
+  document.getElementById('trash-tbody').innerHTML = trash.length ? trash.map(p=>`
+    <tr>
+      <td>${p.name}</td><td>${p.no}</td><td>${p.deletedAt}</td>
+      <td><button class="btn secondary" style="padding:5px 10px;font-size:12px;" onclick="restorePolicy(${p.id})">救回</button></td>
+    </tr>`).join('') : `<tr><td colspan="4" class="empty">垃圾桶是空的</td></tr>`;
+}
+
+renderAll();
+</script>
+</body>
+</html>
